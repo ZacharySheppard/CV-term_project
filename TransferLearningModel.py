@@ -1,36 +1,37 @@
-from keras.layers import Dense, GlobalAveragePooling2D
-from keras.applications import MobileNet
-from keras.applications.mobilenet import preprocess_input
+from keras.layers import Dense, GlobalAveragePooling2D, Dropout, Flatten
+from keras.applications import MobileNet, VGG16
 from keras.preprocessing.image import ImageDataGenerator
-from keras.models import Model
-
+from keras.models import Model, Sequential
+from keras import optimizers
+from keras.callbacks import EarlyStopping
 
 
 # imports the mobilenet model and discards the last 1000 neuron layer.
-base_model = MobileNet(weights='imagenet', include_top=False)
+base_model = MobileNet(input_shape=[255, 255, 3], weights='imagenet', include_top=False)
 
+base_model.trainable = False
 
-x = base_model.output
-x = GlobalAveragePooling2D()(x)
-# add dense layers so that the model can learn more complex functions and classify for better results.
-x = Dense(1024, activation='relu')(x)
-x = Dense(1024, activation='relu')(x)
-x = Dense(512, activation='relu')(x)
-# final layer with softmax activation
-preds = Dense(2, activation='softmax')(x)
+model = Sequential([
+    base_model,
+    Flatten(),
+    Dropout(0.2),
+    Dense(3, activation='softmax')
+])
 
-# specify the inputs and outputs
-model = Model(inputs=base_model.input, outputs=preds)
+opt = optimizers.Adam() #learning_rate=0.001
 
-for layer in model.layers[:20]:
-    layer.trainable = False
-for layer in model.layers[20:]:
-    layer.trainable = True
+model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
 
-train_datagen = ImageDataGenerator(preprocessing_function=preprocess_input) #included in our dependencies
+train_datagen = ImageDataGenerator(
+        rescale=1./255,
+        rotation_range=5,
+        brightness_range=[0.9, 1.1],
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True)
 
-train_generator = train_datagen.flow_from_directory('/home/mark/Documents/Term 8/Image Processing/TransferLearn/Learning/',
-                                                 target_size=(224,224),
+train_generator = train_datagen.flow_from_directory('/home/mark/Documents/Term 8/Image Processing/TransferLearn/Learning1/',
+                                                 target_size=(255, 255),
                                                  color_mode='rgb',
                                                  batch_size=32,
                                                  class_mode='categorical',
@@ -38,22 +39,26 @@ train_generator = train_datagen.flow_from_directory('/home/mark/Documents/Term 8
 
 test_datagen = ImageDataGenerator(rescale=1./255)
 
-test_generator = train_datagen.flow_from_directory('/home/mark/Documents/Term 8/Image Processing/TransferLearn/Validation/',
-                                                 target_size=(224,224),
+test_generator = test_datagen.flow_from_directory('/home/mark/Documents/Term 8/Image Processing/TransferLearn/Validation1/',
+                                                 target_size=(255, 255),
                                                  color_mode='rgb',
                                                  batch_size=32,
                                                  class_mode='categorical',
                                                  shuffle=True)
 
 
-model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
 
 step_size_train = train_generator.n//train_generator.batch_size
 step_size_test = test_generator.n//test_generator.batch_size
+
+early_stopping = EarlyStopping(monitor='loss', patience=3)
+
 model.fit_generator(generator=train_generator,
                    steps_per_epoch=step_size_train,
-                   epochs=5,
-                    validation_data=train_generator,
-                    validation_steps=step_size_test)
-
+                   epochs=10,
+                    validation_data=test_generator,
+                    validation_steps=step_size_test,
+                    callbacks=early_stopping
+                    )
 model.save("A$APKeith.h5")
