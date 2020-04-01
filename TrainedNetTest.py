@@ -4,11 +4,13 @@ import numpy as np
 from keras.preprocessing import image
 import serial
 
+
 ser = serial.Serial('/dev/ttyACM0')
 if ser.is_open:
     print("The Port is open \n")
 else:
-    print("The Port is Closed \n")
+    print("Could Not Open Port")
+
 
 model = load_model('lilKeith.h5')
 i = 0
@@ -78,7 +80,7 @@ while rval:
         guess_arr.append(pred)
         if len(guess_arr) == 5:
             validate = max(set(guess_arr), key=guess_arr.count)
-            # print('A$AP Keith Predicts: ', validate)
+            print('A$AP Keith Predicts: ', validate)
             serial_out(validate)
             last_gesture = validate
             guess_arr = []
